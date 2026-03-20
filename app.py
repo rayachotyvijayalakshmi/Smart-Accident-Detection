@@ -54,6 +54,7 @@ if uploaded_file is not None:
     # --- LOGIC VARIABLES ---
     accident_counter = 0
     call_triggered = False
+    total_frame_count=0
     REQUIRED_FRAMES = 5 # Requires ~1 second of continuous detection
     accident_detected_final = False
 
@@ -78,8 +79,11 @@ if uploaded_file is not None:
                     accident_in_this_frame = True
                     break
 
-        # 3. FILTER (Wait for just 3 frames - super fast detection)
-        if accident_in_this_frame:
+        # 3. FILTER (Grace Period Trick + Super Fast Detection)
+        total_frame_count += 1  # This counts every frame from the start
+
+        # Ignore the first 90 frames (approx 3 seconds) to avoid fake starting detections
+        if accident_in_this_frame and total_frame_count > 90:
             accident_counter += 1
         else:
             accident_counter = 0
