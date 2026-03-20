@@ -76,7 +76,8 @@ if uploaded_file is not None:
         for r in results:
             for box in r.boxes:
                 label = model.names[int(box.cls[0])]
-            st.write(f"AI Detected: {label}")
+                st.write(f"AI Detected: {label}")
+                
                 if label in target_labels:
                     accident_in_this_frame = True
                     break
