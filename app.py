@@ -65,50 +65,50 @@ if uploaded_file is not None:
         if not ret:
             break  
 
-        # A. Run YOLO Detection
-        results = model.predict(frame, conf=0.5, verbose=False)
+        # 1. AI PREDICTION (0.3 confidence so it catches fast cars easily)
+        results = model.predict(frame, conf=0.3, verbose=False)
         accident_in_this_frame = False
 
-        # B. Check if any accident labels are found
-        # (Using a list of labels to be safe)
+        # 2. CHECK LABELS
         target_labels = ['Accident', 'severe', 'severe-accident', 'car-accident', 'car-crash']
-        
         for r in results:
             for box in r.boxes:
                 label = model.names[int(box.cls[0])]
-                st.write(f"AI Detected: {label}")
-                
                 if label in target_labels:
                     accident_in_this_frame = True
                     break
 
-        # C. The Filter Logic (Single Car Glitch Fix)
+        # 3. FILTER (Wait for just 3 frames - super fast detection)
         if accident_in_this_frame:
             accident_counter += 1
         else:
             accident_counter = 0
 
-        # D. Trigger Emergency Action
-        if accident_counter >= REQUIRED_FRAMES and not call_triggered:
-            st.error("🚨 REAL ACCIDENT CONFIRMED! Initiating Emergency Protocol...")
-            
-            # Make Twilio Call
-            try:
-                emergency_message = '<Response><Say>Emergency alert! A severe car accident has been detected on the dashboard. Immediate assistance required.</Say></Response>'
-                call = client.calls.create(twiml=emergency_message, to=my_number, from_=twilio_number)
-                st.success(f"Emergency Call SID: {call.sid}")
-                call_triggered = True
-                accident_detected_final = True
-            except Exception as e:
-                st.error(f"Call failed: {e}")
-                call_triggered = True # Mark true anyway to stop retrying
-
-        # E. Process and Show Frame
+        # 4. DRAW THE BOX (Prepare the frame with the box on it)
         annotated_frame = results[0].plot()
         annotated_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
-        stframe.image(annotated_frame, channels="RGB", use_container_width=True)
 
-    cap.release()
+        # 5. TRIGGER & FREEZE-FRAME LOGIC
+        if accident_counter >= 3:
+            # First, display the image with the box so it stays on screen
+            stframe.image(annotated_frame, channels="RGB", use_container_width=True)
+            
+            st.error("🚨 CRITICAL ACCIDENT DETECTED! Video Frozen. Initiating Call...")
+            
+            # Make the Twilio Call
+            try:
+                msg = '<Response><Say>Emergency alert! A severe car accident has been detected.</Say></Response>'
+                call = client.calls.create(twiml=msg, to=my_number, from_=twilio_number)
+                st.success(f"Call successfully sent! SID: {call.sid}")
+                accident_final_status = True
+            except Exception as e:
+                st.error("Twilio Call Failed! Check keys.")
+                
+            # THE MAGIC WORD: Stop the video exactly here!
+            break 
+            
+        # 6. If no accident, just keep playing the video normally
+        stframe.image(annotated_frame, channels="RGB", use_container_width=True)
     
     # 5. Final Status
     if not accident_detected_final:
