@@ -1,3 +1,6 @@
+import os
+os.system("pip uninstall -y opencv-python")
+os.system("pip install opencv-python-headless")
 import streamlit as st
 from ultralytics import YOLO
 from twilio.rest import Client
