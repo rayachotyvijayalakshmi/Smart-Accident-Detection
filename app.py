@@ -54,7 +54,7 @@ if uploaded_file is not None:
     # --- LOGIC VARIABLES ---
     accident_counter = 0
     call_triggered = False
-    REQUIRED_FRAMES = 20 # Requires ~1 second of continuous detection
+    REQUIRED_FRAMES = 8 # Requires ~1 second of continuous detection
     accident_detected_final = False
 
     st.info("Neural Engine analyzing video stream...")
@@ -76,6 +76,7 @@ if uploaded_file is not None:
         for r in results:
             for box in r.boxes:
                 label = model.names[int(box.cls[0])]
+            st.write(f"AI Detected: {label}")
                 if label in target_labels:
                     accident_in_this_frame = True
                     break
