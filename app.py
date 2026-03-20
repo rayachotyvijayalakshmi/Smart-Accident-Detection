@@ -66,7 +66,7 @@ if uploaded_file is not None:
             break  
 
         # 1. AI PREDICTION (0.3 confidence so it catches fast cars easily)
-        results = model.predict(frame, conf=0.9, verbose=False)
+        results = model.predict(frame, conf=0.6, verbose=False)
         accident_in_this_frame = False
 
         # 2. CHECK LABELS
