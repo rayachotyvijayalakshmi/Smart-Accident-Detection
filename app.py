@@ -12,7 +12,7 @@ try:
     my_number = st.secrets["MY_PHONE_NUMBER"]
     client = Client(account_sid, auth_token)
 except Exception as e:
-    st.warning("Twilio Secrets not fully configured. Call feature disabled.")
+    st.warning("Twilio Secrets not fully configured.")
 
 # 2. Website UI Design
 st.set_page_config(page_title="AI Accident Alert", page_icon="🚨", layout="centered")
@@ -24,16 +24,15 @@ st.markdown("""
     h1 { color: #00D2FF !important; text-align: center; text-shadow: 0 0 15px rgba(0, 210, 255, 0.5); font-weight: 800; letter-spacing: 2px; }
     .ai-subtitle { text-align: center; color: #00FF9D; font-size: 1.1rem; margin-bottom: 2rem; font-family: monospace; letter-spacing: 1px; }
     [data-testid="stFileUploadDropzone"] { border: 2px dashed #00D2FF; background-color: rgba(0, 210, 255, 0.05); border-radius: 10px; padding: 2rem; }
-    .stButton>button { background: linear-gradient(90deg, #FF0055 0%, #CC0000 100%); color: white; border-radius: 5px; width: 100%; border: 1px solid #FF0055; box-shadow: 0 0 15px rgba(255, 0, 85, 0.4); font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; transition: all 0.3s ease; }
-    .stButton>button:hover { box-shadow: 0 0 25px rgba(255, 0, 85, 0.8); border-color: #FFFFFF; transform: translateY(-2px); }
+    .stButton>button { background: linear-gradient(90deg, #FF0055 0%, #CC0000 100%); color: white; border-radius: 5px; width: 100%; border: 1px solid #FF0055; box-shadow: 0 0 15px rgba(255, 0, 85, 0.4); font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1>👁️‍🗨️ NeuralVision: Smart Accident_Detection AI</h1>", unsafe_allow_html=True)
+st.markdown("<h1>👁️‍🗨️ NeuralVision: Smart Accident AI</h1>", unsafe_allow_html=True)
 st.markdown("<p class='ai-subtitle'>[ SYSTEM ACTIVE ] // Awaiting traffic surveillance feed...</p>", unsafe_allow_html=True)
 st.markdown("---")
 
-# 3. Load Model (Single Model is safe and fast for Streamlit)
+# 3. Load Model
 @st.cache_resource
 def load_model():
     return YOLO('best.pt')
@@ -50,45 +49,53 @@ if uploaded_file is not None:
     cap = cv2.VideoCapture(tfile.name)
     stframe = st.empty() 
     
-    # --- LOGIC VARIABLES ---
     accident_counter = 0
-    REQUIRED_FRAMES = 3  # Fast response for real accidents
+    REQUIRED_FRAMES = 3  
     accident_detected_final = False
 
-    st.info("Neural Engine analyzing video stream...")
+    st.info("Neural Engine analyzing video stream with Spatial Filtering...")
 
-    # --- MAIN LOOP ---
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break  
+        
+        # Get frame dimensions to create our "Ignore Zone"
+        frame_height, frame_width, _ = frame.shape
+        ignore_zone_limit = frame_width * 0.35  # The left 35% of the screen where the van is parked
 
-        # 1. SMART PREDICTION: Set strictly to 0.65 to ignore the 0.59 fake van!
-        results = model.predict(frame, conf=0.65, verbose=False)
+        # Confidence set back to 0.40 to ensure we catch the messy real crash
+        results = model.predict(frame, conf=0.40, verbose=False)
         accident_in_this_frame = False
 
-        # 2. Check Labels
         target_labels = ['Accident', 'severe', 'severe-accident', 'car-accident', 'car-crash']
+        
         for r in results:
             for box in r.boxes:
                 label = model.names[int(box.cls[0])]
                 if label in target_labels:
+                    # --- THE PRO CV DEVELOPER LOGIC ---
+                    # Get the center X coordinate of the detected box
+                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                    box_center_x = (x1 + x2) / 2
+                    
+                    # If the detection is on the extreme left (like our white van), IGNORE IT!
+                    if box_center_x < ignore_zone_limit:
+                        continue # Skip this detection and move on
+                    
+                    # If it passed the filter, it's a real accident in the driving lanes
                     accident_in_this_frame = True
                     break
 
-        # 3. Filter
         if accident_in_this_frame:
             accident_counter += 1
         else:
-            accident_counter = 0  # Reset immediately if it disappears
+            accident_counter = 0
 
-        # 4. Draw Box
         annotated_frame = results[0].plot()
         annotated_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
 
-        # 5. Freeze & Call Logic
         if accident_counter >= REQUIRED_FRAMES:
-            # Freeze the frame
             stframe.image(annotated_frame, channels="RGB", use_container_width=True)
             st.error("🚨 CRITICAL ACCIDENT DETECTED! Video Frozen. Calling Emergency...")
             
@@ -100,14 +107,12 @@ if uploaded_file is not None:
             except Exception as e:
                 st.error("Twilio Call Failed.")
                 
-            break # Stop video
+            break 
             
-        # Play normally
         stframe.image(annotated_frame, channels="RGB", use_container_width=True)
     
     cap.release()
     
-    # 6. Final Status
     if not accident_detected_final:
         st.success("✅ Analysis Complete: No accidents detected. Road is clear.")
     else:
