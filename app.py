@@ -54,7 +54,7 @@ if uploaded_file is not None:
     # --- LOGIC VARIABLES ---
     accident_counter = 0
     call_triggered = False
-    REQUIRED_FRAMES = 8 # Requires ~1 second of continuous detection
+    REQUIRED_FRAMES = 5 # Requires ~1 second of continuous detection
     accident_detected_final = False
 
     st.info("Neural Engine analyzing video stream...")
@@ -66,7 +66,7 @@ if uploaded_file is not None:
             break  
 
         # A. Run YOLO Detection
-        results = model.predict(frame, conf=0.6, verbose=False)
+        results = model.predict(frame, conf=0.5, verbose=False)
         accident_in_this_frame = False
 
         # B. Check if any accident labels are found
