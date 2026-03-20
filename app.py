@@ -14,8 +14,79 @@ client = Client(account_sid, auth_token)
 
 # 2. Website UI Design
 st.set_page_config(page_title="AI Accident Alert", page_icon="🚨", layout="centered")
-st.title("🚨 Smart Traffic Accident Detection")
-st.write("Upload a traffic surveillance video. The AI will monitor it and make an automated emergency call if an accident occurs.")
+import streamlit as st
+
+# --- HIGH-TECH AI DASHBOARD CSS ---
+st.markdown("""
+<style>
+    /* Main background - Deep futuristic dark blue/black */
+    .stApp {
+        background-color: #0A0E17;
+        color: #E2E8F0;
+    }
+    
+    /* Hide the default Streamlit top header */
+    [data-testid="stHeader"] {
+        background-color: transparent;
+    }
+
+    /* Futuristic neon title */
+    h1 {
+        color: #00D2FF !important;
+        text-align: center;
+        text-shadow: 0 0 15px rgba(0, 210, 255, 0.5);
+        font-weight: 800;
+        letter-spacing: 2px;
+        font-family: 'Arial', sans-serif;
+    }
+
+    /* Subtitle / Terminal-like description */
+    .ai-subtitle {
+        text-align: center;
+        color: #00FF9D;
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+        font-family: monospace;
+        letter-spacing: 1px;
+    }
+
+    /* Glowing Emergency Button */
+    .stButton>button {
+        background: linear-gradient(90deg, #FF0055 0%, #CC0000 100%);
+        color: white;
+        border-radius: 5px;
+        width: 100%;
+        border: 1px solid #FF0055;
+        box-shadow: 0 0 15px rgba(255, 0, 85, 0.4);
+        font-weight: bold;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        transition: all 0.3s ease;
+    }
+
+    /* Button Hover Effect */
+    .stButton>button:hover {
+        box-shadow: 0 0 25px rgba(255, 0, 85, 0.8);
+        border-color: #FFFFFF;
+        transform: translateY(-2px);
+    }
+
+    /* File uploader styling with neon border */
+    [data-testid="stFileUploadDropzone"] {
+        border: 2px dashed #00D2FF;
+        background-color: rgba(0, 210, 255, 0.05);
+        border-radius: 10px;
+        padding: 2rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# --- APP UI CONTENT ---
+st.markdown("<h1>👁️‍🗨️ NeuralVision: Smart Accident AI</h1>", unsafe_allow_html=True)
+st.markdown("<p class='ai-subtitle'>[ SYSTEM ACTIVE ] // Awaiting traffic surveillance feed...</p>", unsafe_allow_html=True)
+st.markdown("---")
+
+# The rest of your Python code continues below this...
 
 # 3. Load Model
 @st.cache_resource
