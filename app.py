@@ -44,7 +44,7 @@ if uploaded_file is not None:
             break
         
         # AI Detection
-        results = model.predict(frame, conf=0.40, verbose=False)
+        results = model.predict(frame, conf=0.60, verbose=False)
         annotated_frame = results[0].plot()
         
         # Display the video on the website
