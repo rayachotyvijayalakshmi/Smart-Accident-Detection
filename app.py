@@ -108,46 +108,53 @@ if uploaded_file is not None:
     accident_detected = False
 
     st.info("Analyzing video frame by frame...")
-    # --- LOGIC SETUP ---
-    accident_counter = 0      # Counts consecutive frames where accident is seen
-    call_triggered = False     # Ensures only ONE call is sent per video
-    STRICT_THRESHOLD = 20      # Approx 1 second of continuous detection needed
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-        # 1. Run YOLO detection
-    results = model(frame, conf=0.6)
-    
-    # This flag checks if an accident is found in THIS specific frame
-    accident_seen_now = False
+   # --- BEFORE THE LOOP ---
+accident_counter = 0
+call_triggered = False
+REQUIRED_FRAMES = 20 # Requires ~1 second of continuous detection
 
-    # 2. Check labels in the current frame
+# --- THE LOOP ---
+while cap.isOpened():
+    ret, frame = cap.read()
+    
+    # 1. STOP if video ends
+    if not ret:
+        break  
+
+    # 2. RUN YOLO
+    # Ensure 'conf' is high to avoid random detections
+    results = model.predict(frame, conf=0.6, verbose=False)
+    accident_in_this_frame = False
+
+    # 3. CHECK EVERY BOX
     for r in results:
         for box in r.boxes:
             label = model.names[int(box.cls[0])]
+            # CRITICAL: This name must match your model's label exactly
             if label == "Accident":
-                accident_seen_now = True
-                break 
+                accident_in_this_frame = True
+                break
 
-    # 3. The Filter Logic (Resetting if it's just a passing car)
-    if accident_seen_now:
+    # 4. THE FILTER LOGIC
+    if accident_in_this_frame:
         accident_counter += 1
-        print(f"Confidence Building: {accident_counter}/{STRICT_THRESHOLD}")
     else:
-        # If the box disappears even for one frame, reset the counter to zero.
-        # This is what stops the "Single Car" false alarms!
+        # This resets the counter if it's just a passing car
         accident_counter = 0
 
-    # 4. Trigger the Alert only if evidence is strong (20+ frames)
-    if accident_counter >= STRICT_THRESHOLD and not call_triggered:
+    # 5. TRIGGER THE EMERGENCY CALL
+    if accident_counter >= REQUIRED_FRAMES and not call_triggered:
+        st.error("🚨 REAL ACCIDENT CONFIRMED! Calling Emergency Services...")
         
-        # --- PASTE YOUR TWILIO CALL CODE HERE ---
-        # Example: client.calls.create(to=..., from_=..., url=...)
-        # ----------------------------------------
+        # --- [YOUR TWILIO CODE GOES HERE] ---
+        # Example: 
+        # client.calls.create(to="YOUR_NUM", from_="TWILIO_NUM", url="http://demo.twilio.com/docs/voice.xml")
         
-        st.error("🚨 REAL ACCIDENT CONFIRMED! Emergency Call Dispatched.")
-        call_triggered = True # Locks the system so it doesn't call again
+        call_triggered = True
+
+    # 6. SHOW THE VIDEO
+    annotated_frame = results[0].plot()
+    st_frame.image(annotated_frame, channels="BGR", use_container_width=True)
         # AI Detection
         results = model.predict(frame, conf=0.60, verbose=False)
         annotated_frame = results[0].plot()
