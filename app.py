@@ -5,7 +5,7 @@ import cv2
 import tempfile
 import numpy as np
 
-# 1. Twilio Credentials
+# 1. Twilio Credentials Setup
 try:
     account_sid = st.secrets["TWILIO_ACCOUNT_SID"]
     auth_token = st.secrets["TWILIO_AUTH_TOKEN"]
@@ -13,10 +13,10 @@ try:
     my_number = st.secrets["MY_PHONE_NUMBER"]
     client = Client(account_sid, auth_token)
 except Exception as e:
-    st.warning("Twilio Secrets missing.")
+    st.warning("Twilio Secrets not fully configured.")
 
 # 2. UI Design
-st.set_page_config(page_title="AI Accident Alert", page_icon="🚨", layout="centered")
+st.set_page_config(page_title="NeuralVision AI", page_icon="🚨", layout="centered")
 
 st.markdown("""
 <style>
@@ -28,17 +28,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<h1>👁️‍🗨️ NeuralVision: Smart Crash Detection</h1>", unsafe_allow_html=True)
-st.markdown("<p class='ai-subtitle'>[ SYSTEM ACTIVE ] // Double-Detection & Spatial Filters applied...</p>", unsafe_allow_html=True)
+st.markdown("<p class='ai-subtitle'>[ SYSTEM ACTIVE ] // Motion-Gated AI Engine Running...</p>", unsafe_allow_html=True)
 st.markdown("---")
 
-# 3. Load Model
+# 3. Load YOLO Model
 @st.cache_resource
 def load_model():
     return YOLO('yolov8n.pt')  
 
 model = load_model()
 
-# --- THE PERFECT OVERLAP LOGIC ---
+# --- IOU LOGIC ---
 def calculate_iou(box1, box2):
     x1, y1, x2, y2 = box1
     x3, y3, x4, y4 = box2
@@ -53,14 +53,12 @@ def calculate_iou(box1, box2):
         union_area = box1_area + box2_area - inter_area
         iou = inter_area / union_area
         
-        # PRO FIX: 
-        # > 0.15 means they are actually crashing into each other.
-        # < 0.85 means they are NOT the exact same vehicle detected twice.
+        # Checking for real overlap
         if 0.15 < iou < 0.85: 
             return True
     return False
 
-# 4. Video Upload 
+# 4. Video Processing
 uploaded_file = st.file_uploader("Upload Surveillance Feed (MP4/AVI)", type=['mp4', 'avi', 'mov'])
 
 if uploaded_file is not None:
@@ -70,57 +68,72 @@ if uploaded_file is not None:
     cap = cv2.VideoCapture(tfile.name)
     stframe = st.empty() 
     
+    # --- THE PRO FEATURE: Background Subtractor (Finds only MOVING things) ---
+    backSub = cv2.createBackgroundSubtractorMOG2(history=100, varThreshold=40, detectShadows=False)
+    
     accident_counter = 0
-    REQUIRED_FRAMES = 5  
+    REQUIRED_FRAMES = 3  
     accident_detected_final = False
+    frame_count = 0
 
-    st.info("Neural Engine running advanced filters...")
+    st.info("Neural Engine syncing with Motion Physics...")
 
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break  
             
-        frame_width = frame.shape[1]
+        frame_count += 1
         
-        # Detect vehicles
+        # 1. Learn the background (Creates a black & white motion mask)
+        fgMask = backSub.apply(frame)
+        
+        # Wait for 30 frames so the AI learns that the Van is "Parked" and ignores it
+        if frame_count < 30:
+            stframe.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), channels="RGB")
+            continue
+
+        # 2. YOLO Detection
         results = model.predict(frame, conf=0.40, verbose=False)
-        vehicles = []
-        vehicle_classes = [2, 3, 5, 7] 
+        active_vehicles = []
+        vehicle_classes = [2, 3, 5, 7] # car, motorcycle, bus, truck
         
         for r in results:
             for box in r.boxes:
                 if int(box.cls[0]) in vehicle_classes:
-                    vehicles.append(box.xyxy[0].cpu().numpy())
+                    x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
+                    
+                    # --- MOTION GATE LOGIC ---
+                    # Check the motion mask strictly inside this vehicle's box
+                    box_mask = fgMask[y1:y2, x1:x2]
+                    moving_pixels = cv2.countNonZero(box_mask)
+                    total_pixels = (x2 - x1) * (y2 - y1)
+                    
+                    # If the box has > 5% moving pixels, it's a moving vehicle!
+                    # The parked van will have 0% moving pixels and will be DROPPED.
+                    if total_pixels > 0 and (moving_pixels / total_pixels) > 0.05:
+                        active_vehicles.append([x1, y1, x2, y2])
 
+        # 3. Crash Detection (ONLY on actively moving vehicles)
         crash_detected_now = False
         crashing_vehicles = []
         
-        for i in range(len(vehicles)):
-            for j in range(i + 1, len(vehicles)):
-                if calculate_iou(vehicles[i], vehicles[j]):
-                    
-                    # THE CURSED VAN FILTER: Check where this crash is happening
-                    box_center_x = (vehicles[i][0] + vehicles[i][2]) / 2
-                    
-                    # Ignore anything happening in the extreme left 35% of the screen!
-                    if box_center_x < (frame_width * 0.35):
-                        continue # Skip this fake crash!
-                        
+        for i in range(len(active_vehicles)):
+            for j in range(i + 1, len(active_vehicles)):
+                if calculate_iou(active_vehicles[i], active_vehicles[j]):
                     crash_detected_now = True
-                    crashing_vehicles.append(vehicles[i])
-                    crashing_vehicles.append(vehicles[j])
+                    crashing_vehicles.append(active_vehicles[i])
+                    crashing_vehicles.append(active_vehicles[j])
 
-        # Temporal filter
+        # 4. Trigger Logic
         if crash_detected_now:
             accident_counter += 1
         else:
             accident_counter = 0
 
-        # Draw Frame
         annotated_frame = frame.copy()
         
-        for v in vehicles:
+        for v in active_vehicles:
             cv2.rectangle(annotated_frame, (int(v[0]), int(v[1])), (int(v[2]), int(v[3])), (0, 255, 0), 2)
             
         if crash_detected_now:
@@ -132,23 +145,17 @@ if uploaded_file is not None:
 
         if accident_counter >= REQUIRED_FRAMES:
             stframe.image(annotated_frame, channels="RGB", use_container_width=True)
-            st.error("🚨 REAL CRASH DETECTED! Calling Emergency...")
+            st.error("🚨 CRITICAL ACCIDENT DETECTED! Calling Emergency...")
             
             try:
-                msg = '<Response><Say>Emergency alert! A severe car accident has been detected.</Say></Response>'
+                msg = '<Response><Say>Emergency alert! A collision has been detected.</Say></Response>'
                 call = client.calls.create(twiml=msg, to=my_number, from_=twilio_number)
                 st.success("Call successfully sent!")
                 accident_detected_final = True
             except Exception as e:
                 st.error("Call Failed.")
-                
             break 
             
         stframe.image(annotated_frame, channels="RGB", use_container_width=True)
     
     cap.release()
-    
-    if not accident_detected_final:
-        st.success("✅ Analysis Complete: No crashes detected. Road is safe.")
-    else:
-        st.warning("⚠️ System Log: Emergency services notified.")
