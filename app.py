@@ -109,9 +109,9 @@ if uploaded_file is not None:
 
     st.info("Analyzing video frame by frame...")
     # --- LOGIC SETUP ---
-accident_counter = 0      # Counts consecutive frames where accident is seen
-call_triggered = False     # Ensures only ONE call is sent per video
-STRICT_THRESHOLD = 20      # Approx 1 second of continuous detection needed
+    accident_counter = 0      # Counts consecutive frames where accident is seen
+    call_triggered = False     # Ensures only ONE call is sent per video
+    STRICT_THRESHOLD = 20      # Approx 1 second of continuous detection needed
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
